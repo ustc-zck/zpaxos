@@ -18,3 +18,4 @@ void KV::Put(std::string key, std::string val){
 void KV::Del(std::string key){
     storage.erase(key);
 }
+

@@ -1,16 +1,26 @@
 #include <string>
-#include <unordered_map>
 #include <set>
+#include <map>
+#include "kv.h"
 
 class Node{
     public:
-        Node();
+        Node(std::string addr_);
         ~Node();
+        //db operation, get, put and del
+        std::string Get(std::string key);
+        void Put(std::string key, std::string val);
+        void Del(std::string key);
+        const static int MASTER = 0;
+        const static int FOLLOWER = 1;
+        const static int CANDIDATE = 2;
+        int role; 
+        int64_t maxProposalID; //max proposal id had accepted
+        std::string maxProposalCommand; //command of maxProposalID
+        int64_t minProposalID; //min proposal id
+        std::map<int64_t, std::string> logCommands; //log commands
+        uint64_t lastReceivedTime; //last time of receiving packet
     private:
-        int role; //0 proposer, 1 acceptor
-        int64_t acceptedProposalID; //目前接收过的最大的proposal ID
-        std::string acceptedCommand; //acceptedProposalID对应的command
-        int64_t minProposalID; //目前最小的proposal id
-        std::set<int64_t> logIDs;
-        std::unordered_map<int64_t, std::string> commands;
+        KV* kv;
+        std::string addr;
 };

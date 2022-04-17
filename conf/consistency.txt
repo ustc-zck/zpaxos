@@ -1,0 +1,3 @@
+maxProposalID: -1
+maxProposalCommand: NULl
+minProposalID: -1

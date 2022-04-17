@@ -13,8 +13,12 @@ class Paxos{
         int Accept();
         //timer event...
         int Ping();
+        //request vote...   
+
     private:
-        Node* node;
-        std::vector<Node*> peers;
+        Node* self;
+        std::vector<std::string> peers;
         int64_t lastReceivedTime;
+        int64_t electionTimeOut;
+
 };
