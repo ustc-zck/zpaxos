@@ -1,4 +1,4 @@
-#include "../src/server.h"
+#include "../../src/server.h"
 #include <iostream>
 
 // void print(const boost::system::error_code& /*e*/)
@@ -24,7 +24,7 @@ void print(const boost::system::error_code& e, boost::asio::steady_timer*t, int6
 using namespace boost::placeholders;
 
 int main(){
-    Server* s = new Server();
+    Server * s = new Server();
     s->WaitRepeated(print, 1000);
     delete s;
     return 0;
