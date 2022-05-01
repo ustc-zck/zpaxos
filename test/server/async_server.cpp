@@ -15,14 +15,20 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/asio.hpp>
+#include <boost/array.hpp>
+
 
 using boost::asio::ip::tcp;
 
-std::string make_daytime_string()
-{
-  using namespace std; // For time_t, time and ctime;
-  time_t now = time(0);
-  return ctime(&now);
+// std::string make_daytime_string()
+// {
+//   using namespace std; // For time_t, time and ctime;
+//   time_t now = time(0);
+//   return ctime(&now);
+// }
+
+std::string echo(const std::string & s){
+  return s;
 }
 
 class tcp_connection : public boost::enable_shared_from_this<tcp_connection>
@@ -44,8 +50,15 @@ public:
   //handler...
   void start()
   {
-    message_ = make_daytime_string();
+    //test read data...
+    boost::array<char, 128> buf;
+    boost::system::error_code error;
+
+    size_t len = socket_.read_some(boost::asio::buffer(buf), error);
+    std::string data(buf.begin(), buf.begin() + len);
+    message_ = echo(data);
     std::cout << "accept socket" << std::endl;
+    std::cout << "server receive message " << message_ << std::endl;
     boost::asio::async_write(socket_, boost::asio::buffer(message_),
         boost::bind(&tcp_connection::handle_write, shared_from_this(),
           boost::asio::placeholders::error,
