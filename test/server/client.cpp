@@ -29,7 +29,7 @@ int main(int argc, char* argv[])
 
     tcp::resolver resolver(io_context);
     tcp::resolver::results_type endpoints =
-      resolver.resolve("127.0.0.1", "13");
+      resolver.resolve("127.0.0.1", "8080");
 
     tcp::socket socket(io_context);
     boost::asio::connect(socket, endpoints);

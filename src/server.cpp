@@ -5,90 +5,80 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/asio.hpp>
+#include <boost/array.hpp>
+#include <functional>
+
 
 using boost::asio::ip::tcp;
+using namespace std::placeholders; 
 
-std::string make_daytime_string()
-{
-  using namespace std; // For time_t, time and ctime;
-  time_t now = time(0);
-  return ctime(&now);
-}
-
-class tcp_connection : public boost::enable_shared_from_this<tcp_connection>
-{
+class tcp_connection : public boost::enable_shared_from_this<tcp_connection> {
 public:
-  typedef boost::shared_ptr<tcp_connection> pointer;
-
-  static pointer create(boost::asio::io_context& io_context)
-  {
-    return pointer(new tcp_connection(io_context));
-  }
-
-  tcp::socket& socket()
-  {
-    return socket_;
-  }
-
-
-  //handler...
-  void start()
-  {
-    message_ = make_daytime_string();
-    std::cout << "accept socket" << std::endl;
-    boost::asio::async_write(socket_, boost::asio::buffer(message_),
-        boost::bind(&tcp_connection::handle_write, shared_from_this(),
-          boost::asio::placeholders::error,
-          boost::asio::placeholders::bytes_transferred));
-  }
-
-private:
-  tcp_connection(boost::asio::io_context& io_context)
-    : socket_(io_context)
-  {
-  }
-
-  void handle_write(const boost::system::error_code& /*error*/,
-      size_t /*bytes_transferred*/)
-  {
-  }
-
-  tcp::socket socket_;
-  std::string message_;
-};
-
-class tcp_server
-{
-public:
-  tcp_server(boost::asio::io_context& io_context)
-    : io_context_(io_context),
-      acceptor_(io_context, tcp::endpoint(tcp::v4(), 13))
-  {
-    start_accept();
-  }
-
-private:
-  void start_accept()
-  {
-    tcp_connection::pointer new_connection =
-      tcp_connection::create(io_context_);
-
-    acceptor_.async_accept(new_connection->socket(),
-        boost::bind(&tcp_server::handle_accept, this, new_connection,
-          boost::asio::placeholders::error));
-  }
-
-  void handle_accept(tcp_connection::pointer new_connection,
-      const boost::system::error_code& error)
-  {
-    if (!error)
-    {
-      new_connection->start();
+    typedef boost::shared_ptr<tcp_connection> pointer;
+    static pointer create(boost::asio::io_context& io_context, std::function<std::string(std::string)> handler_){
+        return pointer(new tcp_connection(io_context, handler_));
     }
 
-    start_accept();
-  }
+    tcp::socket& socket(){
+        return socket_;
+    }
 
-  boost::asio::io_context& io_context_;
-  tcp::acceptor acceptor_;
+    //handler...
+    void start() {
+        //test read data...
+        boost::array<char, 128> buf;
+        boost::system::error_code error;
+
+        size_t len = socket_.read_some(boost::asio::buffer(buf), error);
+        std::string data(buf.begin(), buf.begin() + len);
+
+        message_ = handler(data);
+        
+        std::cout << "accept socket" << std::endl;
+        std::cout << "server receive message " << message_ << std::endl;
+        boost::asio::async_write(socket_, boost::asio::buffer(message_), 
+            boost::bind(&tcp_connection::handle_write, shared_from_this(),
+            boost::asio::placeholders::error,
+            boost::asio::placeholders::bytes_transferred));
+    }
+
+private:
+    tcp_connection(boost::asio::io_context& io_context, std::function<std::string(std::string)> handler_) : socket_(io_context), handler(handler_) {
+    }
+
+    void handle_write(const boost::system::error_code& /*error*/, size_t /*bytes_transferred*/){
+    }
+
+    tcp::socket socket_;
+    std::string message_;
+    std::function<std::string(std::string)> handler;
 };
+
+class tcp_server {
+public:
+    tcp_server(boost::asio::io_context& io_context, std::function<std::string(std::string)> handler_, int port_) : io_context_(io_context), 
+        handler(handler_),
+        acceptor_(io_context, tcp::endpoint(tcp::v4(), port_)){
+            std::cout << "server is listening on port: " << port_ << std::endl;
+            start_accept();
+    }
+
+private:
+    void start_accept(){
+        tcp_connection::pointer new_connection = tcp_connection::create(io_context_, handler);
+        acceptor_.async_accept(new_connection->socket(), 
+            boost::bind(&tcp_server::handle_accept, this, new_connection, boost::asio::placeholders::error));
+    }
+
+    void handle_accept(tcp_connection::pointer new_connection, const boost::system::error_code& error){
+        if (!error) {
+            new_connection->start();
+        }
+        start_accept();
+    }
+
+    boost::asio::io_context& io_context_;
+    tcp::acceptor acceptor_;
+    std::function<std::string(std::string)> handler;
+};
+
