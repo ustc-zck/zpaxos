@@ -7,6 +7,7 @@
 #include <boost/asio.hpp>
 #include <boost/array.hpp>
 #include <functional>
+#include <boost/function.hpp>
 
 
 using boost::asio::ip::tcp;
@@ -54,6 +55,7 @@ private:
     std::function<std::string(std::string)> handler;
 };
 
+
 class tcp_server {
 public:
     tcp_server(boost::asio::io_context& io_context, std::function<std::string(std::string)> handler_, int port_) : io_context_(io_context), 
@@ -62,6 +64,23 @@ public:
             std::cout << "server is listening on port: " << port_ << std::endl;
             start_accept();
     }
+    //wait for milliscends to happen
+    void WaitOnce(boost::asio::io_context& io_context, boost::function<void(void)> timerEvent, int64_t interval){
+        boost::asio::steady_timer t(io_context, boost::asio::chrono::milliseconds(interval));
+        t.wait();
+        timerEvent();
+    }
+
+    //wait repeated
+    void WaitRepeated(boost::asio::io_context& io_context, boost::function<void(void)> timerEvent, int64_t interval){
+        boost::asio::steady_timer t(io_context, boost::asio::chrono::milliseconds(interval));
+        t.wait();
+        timerEvent();
+        this->WaitRepeated(io_context, timerEvent, interval);
+        //t.expires_at(t.expiry() + boost::asio::chrono::milliseconds(interval));
+        //note that how to bind member function in boost bind...
+        //t.async_wait(boost::bind(&tcp_server::WaitRepeated, this, timerEvent, interval));
+    }   
 
 private:
     void start_accept(){
