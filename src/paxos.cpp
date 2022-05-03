@@ -18,7 +18,6 @@ Paxos::Paxos(){
         }
     }
 
-    role = FOLLOWER;
     std::string consistent = ReadFromFile("../conf/consistency.txt");
     if (consistent == ""){
         maxProposalID = -1;
@@ -40,17 +39,20 @@ Paxos::Paxos(){
         }
     }
     kv = new KV();
+    //test
+    //role = CANDIDATE;
+    role = FOLLOWER;
     isVoted = NotVoted;
     leader = NOLEADER;
     lastReceivedTime = GetCurrentMillSeconds();
     port = std::stoul(SplitStr(self, ':')[1]);
-    std::cout << "self addr is " << self << std::endl;
-    std::cout << "ping time out is " << pingTimeOut << std::endl;
-    std::cout << "election time out is " << electionTimeOut << std::endl;
-    std::cout << "port is " << port << std::endl;
-    for(auto& peer : peers){
-        std::cout << "peer is " << peer << std::endl;
-    }
+    // std::cout << "self addr is " << self << std::endl;
+    // std::cout << "ping time out is " << pingTimeOut << std::endl;
+    // std::cout << "election time out is " << electionTimeOut << std::endl;
+    // std::cout << "port is " << port << std::endl;
+    // for(auto& peer : peers){
+    //     std::cout << "peer is " << peer << std::endl;
+    // }
 }
 
 Paxos::~Paxos(){
@@ -99,32 +101,32 @@ void Paxos::receivePingTimeout(){
     leader = NOLEADER;
     votes = 0;
     //wait a random time to start to request vote...
-    usleep(GenerateRandomNumber() * electionTimeOut * 1000);
+    //usleep(GenerateRandomNumber() * pingTimeOut * 1000);
     if(isVoted == NotVoted){
         votes++;
         isVoted = HasVoted;
     }
     for(auto& peer : peers){
         //send request vote...
-        std::cout << "addr is " << peer << std::endl;
-        auto addr = SplitStr(peer, ':');
-        Client* cli = new Client(addr[0], addr[1]);
-        std::string message(REQUESTSIGN);
-        message += "\t";
-        message += OPERATIONTYPE;
-        message += "\t";
-        message += "REQUESTVOTE";
-        // message += "\t";
-        // message += STRINGTYPE;
-        // message += "\t";
-        // message += self;
-        if(cli->Write(message) < 0){
-            std::cout << "failed to send data to " << peer << std::endl;
-        }
-        std::string resp = cli->Read();
-        auto items = SplitStr(resp, '\t');
-        if(items[0] == RESPSIGN && items[1] == RESPOK && items[2] == STRINGTYPE && items[3] == "OK"){
-            votes += 1;
+        try{
+            auto addr = SplitStr(peer, ':');
+            Client* cli = new Client(addr[0], addr[1]);
+            std::string message(REQUESTSIGN);
+            message += "\t";
+            message += OPERATIONTYPE;
+            message += "\t";
+            message += "REQUESTVOTE";
+
+            if(cli->Write(message) < 0){
+                std::cout << "failed to send data to " << peer << std::endl;
+            }
+            std::string resp = cli->Read();
+            auto items = SplitStr(resp, '\t');
+            if(items[0] == RESPSIGN && items[1] == RESPOK && items[2] == STRINGTYPE && items[3] == "OK"){
+                votes += 1;
+            }
+        } catch(const std::exception& e){
+            //std::cout << e.what() << std::endl;
         }
     }
     if (votes > (1 + peers.size()) / 2.0){
@@ -155,9 +157,9 @@ void Paxos::ping(const boost::system::error_code& /*e*/, boost::asio::steady_tim
 }
 //timer event, check if ping time out or not, interval is set as interval / 2
 void Paxos::isPingTimeOut(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t){
-    std::cout << "check if ping time out or not" << std::endl;
+    //std::cout << "check if ping time out or not" << std::endl;
     if(GetCurrentMillSeconds() - lastReceivedTime >= pingTimeOut){
-        //std::cout << "ping time out" << std::endl;
+        std::cout << "ping time out, start election" << std::endl;
         this->receivePingTimeout();
     }
     t->expires_at(t->expiry() + boost::asio::chrono::milliseconds(pingTimeOut/2));
@@ -213,8 +215,8 @@ void Paxos::run(){
     t.async_wait(boost::bind(&Paxos::isPingTimeOut, this, boost::asio::placeholders::error, &t));
 
     // //timer event, ping other paxos instances...
-    boost::asio::steady_timer t1(io, boost::asio::chrono::milliseconds(pingTimeOut/4));
-    t1.async_wait(boost::bind(&Paxos::ping, this, boost::asio::placeholders::error, &t1));
+    // boost::asio::steady_timer t1(io, boost::asio::chrono::milliseconds(pingTimeOut/4));
+    // t1.async_wait(boost::bind(&Paxos::ping, this, boost::asio::placeholders::error, &t1));
 
     io.run();
 }

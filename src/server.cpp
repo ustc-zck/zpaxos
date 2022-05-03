@@ -26,17 +26,18 @@ public:
 
     //handler...
     void start() {
+        std::cout << "accept socket" << std::endl;
+
         //test read data...
         boost::array<char, 128> buf;
         boost::system::error_code error;
 
         size_t len = socket_.read_some(boost::asio::buffer(buf), error);
         std::string data(buf.begin(), buf.begin() + len);
-
+        std::cout << "server receive message " << data << std::endl;
         message_ = handler(data);
         
-        std::cout << "accept socket" << std::endl;
-        std::cout << "server receive message " << message_ << std::endl;
+        
         boost::asio::async_write(socket_, boost::asio::buffer(message_), 
             boost::bind(&tcp_connection::handle_write, shared_from_this(),
             boost::asio::placeholders::error,

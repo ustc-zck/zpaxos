@@ -61,6 +61,7 @@ class Client{
         }
 
         int Write(std::string data){
+            std::cout << "write data into socket: " << data << std::endl; 
             boost::system::error_code error;
             socket.write_some(boost::asio::buffer(data), error);
             if(error){
@@ -74,7 +75,6 @@ class Client{
                 boost::array<char, 128> buf;
                 boost::system::error_code error;
                 size_t len = socket.read_some(boost::asio::buffer(buf), error);
-                // std::cout << "message len is " << len << std::endl;
                 if (error == boost::asio::error::eof)
                     break; // Connection closed cleanly by peer
                 else if (error)
@@ -82,6 +82,7 @@ class Client{
                 std::string tmp(buf.begin(), buf.begin() + len);
                 data += tmp;
             }  
+            std::cout << "read data from socket " << data << std::endl;
             return data;
         }
     private:
