@@ -22,7 +22,7 @@ using namespace std::placeholders;
 using namespace std;
 class Paxos{
     public:
-        Paxos(int port_ = 8080);
+        Paxos();
         ~Paxos();
         //id = -1 represents reject, id > 1 represents accpet...
         std::pair<int64_t, std::string> Prepare(int64_t n);
@@ -35,7 +35,7 @@ class Paxos{
         //master ping...
         void ping(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t);
         //timer event...
-        int receivePing(std::string leader_addr);
+        void receivePing(std::string leader_addr);
 
         //happen when time out with ping...
         void receivePingTimeout();
@@ -47,7 +47,7 @@ class Paxos{
 
         void isPingTimeOut(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t);
     
-        void Run();
+        void run();
 
     private:
         const static int MASTER = 0;
