@@ -40,7 +40,7 @@ Paxos::Paxos(){
     }
     kv = new KV();
     //test
-    //role = CANDIDATE;
+    // role = CANDIDATE;
     role = FOLLOWER;
     isVoted = NotVoted;
     leader = NOLEADER;
@@ -92,6 +92,7 @@ void Paxos::chosenAsLeader(){
     role = MASTER;
     leader = self;
     std::cout << self << " is chosed as leader" << std::endl;
+
 }
 
 //happen when time out with ping...
@@ -101,7 +102,7 @@ void Paxos::receivePingTimeout(){
     leader = NOLEADER;
     votes = 0;
     //wait a random time to start to request vote...
-    //usleep(GenerateRandomNumber() * pingTimeOut * 1000);
+    //usleep(GenerateRandomNumber() * electionTimeOut * 1000);
     if(isVoted == NotVoted){
         votes++;
         isVoted = HasVoted;
@@ -122,13 +123,16 @@ void Paxos::receivePingTimeout(){
             }
             std::string resp = cli->Read();
             auto items = SplitStr(resp, '\t');
+           
             if(items[0] == RESPSIGN && items[1] == RESPOK && items[2] == STRINGTYPE && items[3] == "OK"){
+                std::cout << "get vote from " << peer << std::endl;
                 votes += 1;
             }
         } catch(const std::exception& e){
             //std::cout << e.what() << std::endl;
         }
     }
+    std::cout << "final votes is " << votes << std::endl;
     if (votes > (1 + peers.size()) / 2.0){
         this->chosenAsLeader();
     }
@@ -158,7 +162,7 @@ void Paxos::ping(const boost::system::error_code& /*e*/, boost::asio::steady_tim
 //timer event, check if ping time out or not, interval is set as interval / 2
 void Paxos::isPingTimeOut(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t){
     //std::cout << "check if ping time out or not" << std::endl;
-    if(GetCurrentMillSeconds() - lastReceivedTime >= pingTimeOut){
+    if(role != MASTER && GetCurrentMillSeconds() - lastReceivedTime >= pingTimeOut){
         std::cout << "ping time out, start election" << std::endl;
         this->receivePingTimeout();
     }
@@ -174,6 +178,8 @@ std::string Paxos::handler(const std::string& s){
         resp += "\t";
         resp += RESPERROR;
         resp += "\t";
+        resp += STRINGTYPE;
+        resp += "\t";
         resp += "data type is not valid!"; 
         return resp;
     }
@@ -187,12 +193,16 @@ std::string Paxos::handler(const std::string& s){
             resp += "\t";
             resp += RESPOK;
             resp += "\t";
+            resp += STRINGTYPE;
+            resp += "\t";
             resp += "OK"; 
             return resp;
         }else{
             std::string resp(RESPSIGN);
             resp += "\t";
             resp += RESPOK;
+            resp += "\t";
+            resp += STRINGTYPE;
             resp += "\t";
             resp += "REFUSED"; 
             return resp;
@@ -201,6 +211,8 @@ std::string Paxos::handler(const std::string& s){
         std::string resp(RESPSIGN);
         resp += "\t";
         resp += RESPERROR;
+        resp += "\t";
+        resp += STRINGTYPE;
         resp += "\t";
         resp += "unrecognized operation found!"; 
         return resp;
