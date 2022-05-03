@@ -34,14 +34,12 @@ public:
 
         size_t len = socket_.read_some(boost::asio::buffer(buf), error);
         std::string data(buf.begin(), buf.begin() + len);
-        std::cout << "server receive message " << data << std::endl;
-        message_ = handler(data);
-        
-        
-        boost::asio::async_write(socket_, boost::asio::buffer(message_), 
-            boost::bind(&tcp_connection::handle_write, shared_from_this(),
-            boost::asio::placeholders::error,
-            boost::asio::placeholders::bytes_transferred));
+        std::cout << "read data from socket: " << data << std::endl;
+        std::string resp = handler(data);
+        socket_.write_some(boost::asio::buffer(resp), error);
+        if(!error){
+            std::cout << "write data into socket: " << resp << std::endl;
+        }
     }
 
 private:

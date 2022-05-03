@@ -2,8 +2,7 @@
 
 
 int main(){
-    Client* cli1 = new Client("127.0.0.1", "9000");
-    Client* cli = new Client("127.0.0.1", "9000");
+    Client* cli = new Client("127.0.0.1", "8080");
     std::string message("+");
     message += "\t";
     message += "0";
