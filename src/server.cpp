@@ -64,23 +64,10 @@ public:
             std::cout << "server is listening on port: " << port_ << std::endl;
             start_accept();
     }
-    //wait for milliscends to happen
-    void WaitOnce(boost::asio::io_context& io_context, boost::function<void(void)> timerEvent, int64_t interval){
-        boost::asio::steady_timer t(io_context, boost::asio::chrono::milliseconds(interval));
-        t.wait();
-        timerEvent();
+    
+    void run(){
+        io_context_.run();
     }
-
-    //wait repeated
-    void WaitRepeated(boost::asio::io_context& io_context, boost::function<void(void)> timerEvent, int64_t interval){
-        boost::asio::steady_timer t(io_context, boost::asio::chrono::milliseconds(interval));
-        t.wait();
-        timerEvent();
-        this->WaitRepeated(io_context, timerEvent, interval);
-        //t.expires_at(t.expiry() + boost::asio::chrono::milliseconds(interval));
-        //note that how to bind member function in boost bind...
-        //t.async_wait(boost::bind(&tcp_server::WaitRepeated, this, timerEvent, interval));
-    }   
 
 private:
     void start_accept(){

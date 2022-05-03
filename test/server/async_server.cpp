@@ -85,7 +85,7 @@ class tcp_server
 public:
   tcp_server(boost::asio::io_context& io_context)
     : io_context_(io_context),
-      acceptor_(io_context, tcp::endpoint(tcp::v4(), 13))
+      acceptor_(io_context, tcp::endpoint(tcp::v4(), 8080))
   {
     start_accept();
   }
@@ -116,11 +116,24 @@ private:
   tcp::acceptor acceptor_;
 };
 
+void print(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t, int* count){
+    if (*count < 10000) {
+        std::cout << *count << std::endl;
+        ++(*count);
+        t->expires_at(t->expiry() + boost::asio::chrono::seconds(1));
+        t->async_wait(boost::bind(print, boost::asio::placeholders::error, t, count));
+    }
+}
+
+
 int main()
 {
   try
   {
     boost::asio::io_context io_context;
+    boost::asio::steady_timer t(io_context, boost::asio::chrono::seconds(1));
+    int count = 0;
+    t.async_wait(boost::bind(print, boost::asio::placeholders::error, &t, &count));
     tcp_server server(io_context);
     io_context.run();
   }

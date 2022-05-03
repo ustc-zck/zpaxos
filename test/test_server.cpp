@@ -15,10 +15,11 @@ void print1(){
 //g++ -o test_server test_server.cpp ../src/server.cpp -lpthread
 int main(){
     boost::asio::io_context io_context;
+
     tcp_server* s = new tcp_server(io_context, echo, 8080);
-    s->WaitOnce(io_context, print, 1000);
-    s->WaitRepeated(io_context, print1, 1000);
-    io_context.run();
+    //io_context.run();
+    s->run();
+
     delete s;
     return 0;
 }

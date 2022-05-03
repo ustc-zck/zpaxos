@@ -22,5 +22,9 @@ void WriteIntoFile(std::string filePath, std::string content);
 
 std::vector<std::string> SplitStr(std::string str, char delimiter);
 
+float GenerateRandomNumber();
+
+std::vector<std::string> SplitStr(std::string str, char delimiter);
+
 
 
