@@ -102,9 +102,16 @@ void Paxos::receivePingTimeout(){
     leader = NOLEADER;
     votes = 0;
     //wait a random time to start to request vote...
-    //usleep(GenerateRandomNumber() * electionTimeOut * 1000);
-    if(isVoted == NotVoted){
-        votes++;
+    // usleep(GenerateRandomNumber() * pingTimeOut / 20 * 1000);
+    // if(isVoted == NotVoted){
+    //     votes += 1;
+    //     isVoted = HasVoted;
+    //     std::cout << "vote for self" << std::endl;
+    // }
+    auto randomNum = GenerateRandomNumber();
+    std::cout << "random num is " << randomNum << std::endl;
+    if(isVoted == NotVoted && randomNum > 0.5){
+        votes += 1;
         isVoted = HasVoted;
     }
     for(auto& peer : peers){
@@ -132,6 +139,7 @@ void Paxos::receivePingTimeout(){
             //std::cout << e.what() << std::endl;
         }
     }
+
     std::cout << "final votes is " << votes << std::endl;
     if (votes > (1 + peers.size()) / 2.0){
         this->chosenAsLeader();
@@ -166,7 +174,7 @@ void Paxos::isPingTimeOut(const boost::system::error_code& /*e*/, boost::asio::s
         std::cout << "ping time out, start election" << std::endl;
         this->receivePingTimeout();
     }
-    t->expires_at(t->expiry() + boost::asio::chrono::milliseconds(pingTimeOut/2));
+    t->expires_at(t->expiry() + boost::asio::chrono::milliseconds(pingTimeOut));
     t->async_wait(boost::bind(&Paxos::isPingTimeOut, this, boost::asio::placeholders::error, t));
 }
 
@@ -223,12 +231,12 @@ void Paxos::run(){
     server = new tcp_server(io, std::bind(&Paxos::handler, this, _1), port);
     
     //check if time out or not, if time out, start to request vote...
-    boost::asio::steady_timer t(io, boost::asio::chrono::milliseconds(pingTimeOut/2));
+    boost::asio::steady_timer t(io, boost::asio::chrono::milliseconds(pingTimeOut));
     t.async_wait(boost::bind(&Paxos::isPingTimeOut, this, boost::asio::placeholders::error, &t));
 
     // //timer event, ping other paxos instances...
-    // boost::asio::steady_timer t1(io, boost::asio::chrono::milliseconds(pingTimeOut/4));
-    // t1.async_wait(boost::bind(&Paxos::ping, this, boost::asio::placeholders::error, &t1));
+    boost::asio::steady_timer t1(io, boost::asio::chrono::milliseconds(pingTimeOut/4));
+    t1.async_wait(boost::bind(&Paxos::ping, this, boost::asio::placeholders::error, &t1));
 
     io.run();
 }
