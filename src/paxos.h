@@ -27,28 +27,34 @@ class Paxos{
         //id = -1 represents reject, id > 1 represents accpet...
         std::pair<int64_t, std::string> Prepare(int64_t n);
         //int Promise();
-        int Accept();
+        int Accept(int64_t index, std::string command);
+
+        void sendAcceptCommands(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t);
        
+        void Apply(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t);
         //request vote... 
         int receiveRequestVote();
 
         //master ping...
         void ping(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t);
         //timer event...
-        void receivePing(std::string leader_addr);
+        void receivePing(std::string leader_addr, int64_t commitIndex_);
 
         //happen when time out with ping...
         void receivePingTimeout();
         
         //set as leader
         void chosenAsLeader();
+
+        void catchUp();
         //refer to resp protocol...
         std::string handler(const std::string& s);
 
         void isPingTimeOut(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t);
     
-        std::string GenerateProposalID(){
-            return std::to_string(GetCurrentMicroSeconds()) + "_" + self;
+        int64_t GenerateProposalID(){
+            //return std::to_string(GetCurrentMicroSeconds()) + "_" + self;
+            return commands.size();
         }
 
         void run();
@@ -92,8 +98,11 @@ class Paxos{
         boost::asio::io_context io;
 
         //commands
-        std::map<std::string, std::string> commands;
+        std::map<int64_t, std::string> commands;
+        int64_t commitIndex = -1;
+
+        // std::unordered_map<std::string> commitID
 
         //accepted commands
-        std::map<std::string, std::string> acceptedCommands;
+    
 };

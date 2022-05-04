@@ -61,8 +61,56 @@ std::pair<int64_t, std::string> Paxos::Prepare(int64_t n){
     
 }
 
-int Paxos::Accept(){
+int Paxos::Accept(int64_t index, std::string command){
+    commands[index] = command;
     return 0;
+}
+
+void Paxos::sendAcceptCommands(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t){
+    if(role == MASTER){
+        for(auto command : commands){
+            if(command.first <= commitIndex){
+                continue;
+            }
+            int acceptNum = 0;
+            for(auto peer : peers){
+                try{
+                    auto items = SplitStr(peer, ':');
+                    Client* cli = new Client(items[0], items[1]);
+                    std::string message(REQUESTSIGN);
+                    message += "\t";
+                    message += OPERATIONTYPE;
+                    message += "\t";
+                    message += "ACCEPT";
+                    message += "\t";
+                    message += DOUBLELONGTYPE;
+                    message += "\t";
+                    message += std::to_string(command.first);
+                    message += STRINGTYPE;
+                    message += "\t";
+                    message += command.second;
+                    if(cli->Write(message) < 0){
+                        //free socket...
+                        delete cli;
+                        continue;
+                    }
+                    auto resp = cli->Read();
+                    if (resp.find("OK") != std::string::npos) {
+                        acceptNum++;
+                    }
+                    delete cli;
+                } catch(std::exception & e){
+                    std::cout << "failed to send accept command to peer " << peer << std::endl;
+                }
+            }
+            if((acceptNum + 1) > (1 + peers.size()) / 2.0){
+                commitIndex++;
+            }
+
+        }
+    }
+    t->expires_at(t->expiry() + boost::asio::chrono::milliseconds(10));
+    t->async_wait(boost::bind(&Paxos::ping, this, boost::asio::placeholders::error, t));
 }
 
 //request vote... 
@@ -75,13 +123,14 @@ int Paxos::receiveRequestVote(){
 }
 
 //timer event...
-void Paxos::receivePing(std::string leader_addr){
+void Paxos::receivePing(std::string leader_addr, int64_t commitIndex_){
     std::cout << "receive ping from " << leader_addr << std::endl;
     lastReceivedTime = GetCurrentMillSeconds();
     // if(leader == NOLEADER){
     leader = leader_addr;
     role = FOLLOWER;
     // }
+    commitIndex = commitIndex_;
 }
 
 
@@ -91,6 +140,16 @@ void Paxos::chosenAsLeader(){
     leader = self;
     std::cout << self << " is chosed as leader" << std::endl;
 
+}
+
+void Paxos::catchUp(){
+    if(commands.size() == 0){
+        return;
+    }
+    auto last = commands.end()--;
+    if(last->first < commitIndex){
+        //catch up gap...
+    }
 }
 
 //happen when time out with ping...
@@ -162,6 +221,11 @@ void Paxos::ping(const boost::system::error_code& /*e*/, boost::asio::steady_tim
                 message += STRINGTYPE;
                 message += "\t";
                 message += self;
+                message += "\t";
+                message += DOUBLELONGTYPE;
+                message += "\t";
+                message += std::to_string(commitIndex);
+
                 cli->Write(message);
                 delete cli;
             } catch(std::exception& e){
@@ -205,9 +269,10 @@ std::string Paxos::handler(const std::string& s){
                 delete cli;
             }catch(std::exception& e){
                 std::cout << "failed to transfer data to leader " << e.what() << std::endl;
+                return "ERROR";
             }
         }
-       
+        return "OK";
     }
     
     if(items[0] != REQUESTSIGN || items[1] != OPERATIONTYPE){
@@ -221,8 +286,9 @@ std::string Paxos::handler(const std::string& s){
         return resp;
     }
     if(items[2] == "PING"){
-        if(items[3] == STRINGTYPE){
-            this->receivePing(items[4]);
+        if(items[3] == STRINGTYPE && items[5] == DOUBLELONGTYPE){
+            int64_t index = std::stoull(items[6]);
+            this->receivePing(items[4], index);
         }
         //fix, no string return
         std::string resp(RESPSIGN);
@@ -253,7 +319,21 @@ std::string Paxos::handler(const std::string& s){
             resp += "REFUSED"; 
             return resp;
         }
-    }  else{
+    } else if (items[2] == "ACCEPT"){
+            if(items[3] == DOUBLELONGTYPE && items[5] == STRINGTYPE){
+                int64_t index = std::stoull(items[4]);
+                this->Accept(index, items[6]);
+            }
+            std::string resp(RESPSIGN);
+            resp += "\t";
+            resp += RESPOK;
+            resp += "\t";
+            resp += STRINGTYPE;
+            resp += "\t";
+            resp += "OK"; 
+            return resp;
+
+    } else{
         std::string resp(RESPSIGN);
         resp += "\t";
         resp += RESPERROR;
@@ -265,6 +345,24 @@ std::string Paxos::handler(const std::string& s){
     }
     return NULL;
 }
+
+void Paxos::Apply(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t){
+    for(auto command : commands){
+        if(command.first > commitIndex){
+            break;
+        }
+        auto items = SplitStr(command.second, '\t');
+        if(items[0] == "PUT" && items.size() == 3){
+            kv->Put(items[1], items[2]);
+            commands.erase(command.first);
+        } else if(items[0] == "DEL" && items.size() == 2){
+            kv->Del(items[1]);
+            commands.erase(command.first);
+        }
+    }
+    t->expires_at(t->expiry() + boost::asio::chrono::milliseconds(10));
+    t->async_wait(boost::bind(&Paxos::Apply, this, boost::asio::placeholders::error, t));
+}
 void Paxos::run(){
     server = new tcp_server(io, std::bind(&Paxos::handler, this, _1), port);
     
@@ -272,9 +370,18 @@ void Paxos::run(){
     boost::asio::steady_timer t(io, boost::asio::chrono::milliseconds(pingTimeOut));
     t.async_wait(boost::bind(&Paxos::isPingTimeOut, this, boost::asio::placeholders::error, &t));
 
-    // //timer event, ping other paxos instances...
+    //timer event, ping other paxos instances...
     boost::asio::steady_timer t1(io, boost::asio::chrono::milliseconds(pingTimeOut/4));
     t1.async_wait(boost::bind(&Paxos::ping, this, boost::asio::placeholders::error, &t1));
 
+    //timer event, apply commands which has been commited...
+    boost::asio::steady_timer t2(io, boost::asio::chrono::milliseconds(10));
+    t2.async_wait(boost::bind(&Paxos::Apply, this, boost::asio::placeholders::error, &t2));
+
+    //send commands to peer...
+    boost::asio::steady_timer t3(io, boost::asio::chrono::milliseconds(10));
+    t3.async_wait(boost::bind(&Paxos::sendAcceptCommands, this, boost::asio::placeholders::error, &t3));
+
+    //run io context...
     io.run();
 }
