@@ -109,7 +109,6 @@ void Paxos::receivePingTimeout(){
     //     std::cout << "vote for self" << std::endl;
     // }
     auto randomNum = GenerateRandomNumber();
-    std::cout << "random num is " << randomNum << std::endl;
     if(isVoted == NotVoted && randomNum > 0.5){
         votes += 1;
         isVoted = HasVoted;
