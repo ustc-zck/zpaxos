@@ -129,6 +129,9 @@ void Paxos::receivePingTimeout(){
                 std::cout << "failed to send data to " << peer << std::endl;
             }
             std::string resp = cli->Read();
+            
+            delete cli;
+
             auto items = SplitStr(resp, '\t');
            
             if(items[0] == RESPSIGN && items[1] == RESPOK && items[2] == STRINGTYPE && items[3] == "OK"){
@@ -149,18 +152,25 @@ void Paxos::receivePingTimeout(){
 void Paxos::ping(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t){
     if(role == MASTER){
         for(auto &peer : peers){
-            auto addr = SplitStr(peer, ':');
-            Client* cli = new Client(addr[0], addr[1]);
-            std::string message(REQUESTSIGN);
-            message += "\t";
-            message += OPERATIONTYPE;
-            message += "\t";
-            message += "PING";
-            message += "\t";
-            message += STRINGTYPE;
-            message += "\t";
-            message += self;
-            cli->Write(message);
+            //use try to fix error happen
+            try{
+                auto addr = SplitStr(peer, ':');
+                Client* cli = new Client(addr[0], addr[1]);
+                std::string message(REQUESTSIGN);
+                message += "\t";
+                message += OPERATIONTYPE;
+                message += "\t";
+                message += "PING";
+                message += "\t";
+                message += STRINGTYPE;
+                message += "\t";
+                message += self;
+                cli->Write(message);
+                delete cli;
+            } catch(std::exception& e){
+                std::cout << "failed to ping " << peer << ": " << e.what() << std::endl;
+            }
+
         }
     }
     t->expires_at(t->expiry() + boost::asio::chrono::milliseconds(pingTimeOut / 4));
@@ -195,6 +205,15 @@ std::string Paxos::handler(const std::string& s){
         if(items[3] == STRINGTYPE){
             this->receivePing(items[4]);
         }
+        //fix, no string return
+        std::string resp(RESPSIGN);
+        resp += "\t";
+        resp += RESPOK;
+        resp += "\t";
+        resp += STRINGTYPE;
+        resp += "\t";
+        resp += "OK"; 
+        return resp;
     } else if (items[2] == "REQUESTVOTE"){
         if(this->receiveRequestVote() == 1){
             std::string resp(RESPSIGN);
