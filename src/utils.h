@@ -15,6 +15,7 @@ std::string rtrim(const std::string &s);
 std::string trim(const std::string &s);
 
 uint64_t GetCurrentMillSeconds();
+uint64_t GetCurrentMicroSeconds();
 
 std::string ReadFromFile(std::string filePath);
 

@@ -47,6 +47,10 @@ class Paxos{
 
         void isPingTimeOut(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t);
     
+        std::string GenerateProposalID(){
+            return std::to_string(GetCurrentMicroSeconds()) + "_" + self;
+        }
+
         void run();
 
     private:
@@ -86,4 +90,10 @@ class Paxos{
         tcp_server* server;
         int port;
         boost::asio::io_context io;
+
+        //commands
+        std::map<std::string, std::string> commands;
+
+        //accepted commands
+        std::map<std::string, std::string> acceptedCommands;
 };

@@ -39,8 +39,6 @@ Paxos::Paxos(){
         }
     }
     kv = new KV();
-    //test
-    // role = CANDIDATE;
     role = FOLLOWER;
     isVoted = NotVoted;
     leader = NOLEADER;
@@ -60,7 +58,7 @@ Paxos::~Paxos(){
 }
 
 std::pair<int64_t, std::string> Paxos::Prepare(int64_t n){
-
+    
 }
 
 int Paxos::Accept(){
@@ -169,13 +167,12 @@ void Paxos::ping(const boost::system::error_code& /*e*/, boost::asio::steady_tim
             } catch(std::exception& e){
                 std::cout << "failed to ping " << peer << ": " << e.what() << std::endl;
             }
-
         }
     }
     t->expires_at(t->expiry() + boost::asio::chrono::milliseconds(pingTimeOut / 4));
     t->async_wait(boost::bind(&Paxos::ping, this, boost::asio::placeholders::error, t));
-
 }
+
 //timer event, check if ping time out or not, interval is set as interval / 2
 void Paxos::isPingTimeOut(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t){
     //std::cout << "check if ping time out or not" << std::endl;
@@ -233,6 +230,27 @@ std::string Paxos::handler(const std::string& s){
             resp += "REFUSED"; 
             return resp;
         }
+    } else if(items[0] == "GET"){
+        return kv->Get(items[1]);
+
+    } else if(items[0] == "PUT" || items[0] == "DEL"){
+        if(role == MASTER){
+            commands[this->GenerateProposalID()] = s;
+            for(auto iter = commands.begin(); iter != commands.end(); iter++){
+                std::cout << iter->first << std::endl;
+                std::cout << iter->second << std::endl;
+            }
+        } else {
+            auto items = SplitStr(leader, ':');
+            try{
+                Client* cli = new Client(items[0], items[1]);
+                cli->Write(s);
+                delete cli;
+            }catch(std::exception& e){
+                std::cout << "failed to transfer data to leader " << e.what() << std::endl;
+            }
+        }
+       
     } else{
         std::string resp(RESPSIGN);
         resp += "\t";

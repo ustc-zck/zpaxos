@@ -4,6 +4,10 @@ uint64_t GetCurrentMillSeconds(){
     uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     return now;
 }
+uint64_t GetCurrentMicroSeconds(){
+    return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
 std::string ReadFromFile(std::string filePath){
     std::ifstream inFile;
     inFile.open(filePath);
@@ -51,7 +55,6 @@ std::string trim(const std::string &s) {
 
 float GenerateRandomNumber(){
     srand((unsigned)time(NULL) ); 
- 
     return (float) rand()/RAND_MAX;
 }
 
