@@ -100,6 +100,9 @@ class Paxos{
         //commands
         std::map<int64_t, std::string> commands;
         int64_t lastIndex(){
+            if(commands.size() == 0){
+                return -1;
+            }
             auto last = commands.end()--;
             return last->first;
         }

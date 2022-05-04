@@ -62,7 +62,9 @@ std::pair<int64_t, std::string> Paxos::Prepare(int64_t n){
 }
 
 int Paxos::Accept(int64_t index, std::string command){
-    commands[index] = command;
+    if(index == this->lastIndex() + 1){
+        commands[index] = command;
+    }
     return 0;
 }
 
@@ -150,13 +152,16 @@ void Paxos::chosenAsLeader(){
 
 }
 
+//when commitIndex > lastIndex, need to catch up...
+//consider delete applied commads, leader needs to store the state of each server about gap...
+//if no gap exist, delete commands...
 void Paxos::catchUp(){
     if(commands.size() == 0){
         return;
     }
     auto last = commands.end()--;
     if(last->first < commitIndex){
-        //catch up gap...
+        //catch up gap from master...
     }
 }
 
@@ -208,7 +213,7 @@ void Paxos::receivePingTimeout(){
     }
 
     //std::cout << "final votes is " << votes << std::endl;
-    if (votes > (1 + peers.size()) / 2.0){
+    if ((votes > (1 + peers.size()) / 2.0) && this->lastIndex() >= commitIndex){
         this->chosenAsLeader();
     }
 }
