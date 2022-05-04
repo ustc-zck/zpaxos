@@ -86,6 +86,7 @@ void Paxos::sendAcceptCommands(const boost::system::error_code& /*e*/, boost::as
                     message += DOUBLELONGTYPE;
                     message += "\t";
                     message += std::to_string(command.first);
+                    message += "\t";
                     message += STRINGTYPE;
                     message += "\t";
                     message += command.second;
@@ -105,12 +106,16 @@ void Paxos::sendAcceptCommands(const boost::system::error_code& /*e*/, boost::as
             }
             if((acceptNum + 1) > (1 + peers.size()) / 2.0){
                 commitIndex++;
+                std::cout << "update commitIndex as " << commitIndex << std::endl;
+            } else{
+                //retry...
+                break;
             }
-
         }
     }
+    //std::cout << "commit index is " << commitIndex << std::endl;
     t->expires_at(t->expiry() + boost::asio::chrono::milliseconds(10));
-    t->async_wait(boost::bind(&Paxos::ping, this, boost::asio::placeholders::error, t));
+    t->async_wait(boost::bind(&Paxos::sendAcceptCommands, this, boost::asio::placeholders::error, t));
 }
 
 //request vote... 
@@ -124,13 +129,16 @@ int Paxos::receiveRequestVote(){
 
 //timer event...
 void Paxos::receivePing(std::string leader_addr, int64_t commitIndex_){
-    std::cout << "receive ping from " << leader_addr << std::endl;
+    //std::cout << "receive ping from " << leader_addr << std::endl;
     lastReceivedTime = GetCurrentMillSeconds();
     // if(leader == NOLEADER){
     leader = leader_addr;
     role = FOLLOWER;
     // }
-    commitIndex = commitIndex_;
+    if(commitIndex_ != commitIndex){
+        std::cout << "slave update commitIndex as " << commitIndex_ << std::endl;
+        commitIndex = commitIndex_;
+    }
 }
 
 
@@ -199,7 +207,7 @@ void Paxos::receivePingTimeout(){
         }
     }
 
-    std::cout << "final votes is " << votes << std::endl;
+    //std::cout << "final votes is " << votes << std::endl;
     if (votes > (1 + peers.size()) / 2.0){
         this->chosenAsLeader();
     }
@@ -229,7 +237,7 @@ void Paxos::ping(const boost::system::error_code& /*e*/, boost::asio::steady_tim
                 cli->Write(message);
                 delete cli;
             } catch(std::exception& e){
-                std::cout << "failed to ping " << peer << ": " << e.what() << std::endl;
+                //std::cout << "failed to ping " << peer << ": " << e.what() << std::endl;
             }
         }
     }
@@ -322,17 +330,31 @@ std::string Paxos::handler(const std::string& s){
     } else if (items[2] == "ACCEPT"){
             if(items[3] == DOUBLELONGTYPE && items[5] == STRINGTYPE){
                 int64_t index = std::stoull(items[4]);
-                this->Accept(index, items[6]);
+                std::string command = "";
+                for(int i = 6; i < items.size(); i++){
+                    command += items[i];
+                    command +="\t";
+                }
+                std::cout << "slave accept command " << index << ": " << command << std::endl; 
+                this->Accept(index, command);
+                std::string resp(RESPSIGN);
+                resp += "\t";
+                resp += RESPOK;
+                resp += "\t";
+                resp += STRINGTYPE;
+                resp += "\t";
+                resp += "OK"; 
+                return resp;
+            }else{
+                std::string resp(RESPSIGN);
+                resp += "\t";
+                resp += RESPOK;
+                resp += "\t";
+                resp += STRINGTYPE;
+                resp += "\t";
+                resp += "REFUSE"; 
+                return resp;
             }
-            std::string resp(RESPSIGN);
-            resp += "\t";
-            resp += RESPOK;
-            resp += "\t";
-            resp += STRINGTYPE;
-            resp += "\t";
-            resp += "OK"; 
-            return resp;
-
     } else{
         std::string resp(RESPSIGN);
         resp += "\t";
@@ -345,21 +367,22 @@ std::string Paxos::handler(const std::string& s){
     }
     return NULL;
 }
-
 void Paxos::Apply(const boost::system::error_code& /*e*/, boost::asio::steady_timer* t){
-    for(auto command : commands){
-        if(command.first > commitIndex){
-            break;
-        }
-        auto items = SplitStr(command.second, '\t');
-        if(items[0] == "PUT" && items.size() == 3){
-            kv->Put(items[1], items[2]);
-            commands.erase(command.first);
-        } else if(items[0] == "DEL" && items.size() == 2){
-            kv->Del(items[1]);
-            commands.erase(command.first);
+    if(this->lastIndex() >= commitIndex){
+        for(auto command : commands){
+            if(command.first > commitIndex){
+                break;
+            }
+            auto items = SplitStr(command.second, '\t');
+            if(items[0] == "PUT" && items.size() == 3){
+                kv->Put(items[1], items[2]);
+            } else if(items[0] == "DEL" && items.size() == 2){
+                kv->Del(items[1]);
+            }
         }
     }
+
+    //TODO, erase applied commands...
     t->expires_at(t->expiry() + boost::asio::chrono::milliseconds(10));
     t->async_wait(boost::bind(&Paxos::Apply, this, boost::asio::placeholders::error, t));
 }

@@ -22,7 +22,7 @@ class Client{
         }
 
         int Write(std::string data){
-            std::cout << "write data into socket: " << data << std::endl; 
+            //std::cout << "write data into socket: " << data << std::endl; 
             boost::system::error_code error;
             socket.write_some(boost::asio::buffer(data), error);
             if(error){
@@ -43,7 +43,7 @@ class Client{
                 std::string tmp(buf.begin(), buf.begin() + len);
                 data += tmp;
             }  
-            std::cout << "read data from socket " << data << std::endl;
+            //std::cout << "read data from socket " << data << std::endl;
             return data;
         }
     private:

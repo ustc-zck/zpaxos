@@ -99,6 +99,10 @@ class Paxos{
 
         //commands
         std::map<int64_t, std::string> commands;
+        int64_t lastIndex(){
+            auto last = commands.end()--;
+            return last->first;
+        }
         int64_t commitIndex = -1;
 
         // std::unordered_map<std::string> commitID
