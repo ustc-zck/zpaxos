@@ -187,6 +187,29 @@ void Paxos::isPingTimeOut(const boost::system::error_code& /*e*/, boost::asio::s
 
 std::string Paxos::handler(const std::string& s){
     auto items = SplitStr(s, '\t');
+
+    if(items[0] == "GET"){
+        return kv->Get(items[1]);
+    } else if(items[0] == "PUT" || items[0] == "DEL"){
+        if(role == MASTER){
+            commands[this->GenerateProposalID()] = s;
+            for(auto iter = commands.begin(); iter != commands.end(); iter++){
+                std::cout << iter->first << std::endl;
+                std::cout << iter->second << std::endl;
+            }
+        } else {
+            auto items = SplitStr(leader, ':');
+            try{
+                Client* cli = new Client(items[0], items[1]);
+                cli->Write(s);
+                delete cli;
+            }catch(std::exception& e){
+                std::cout << "failed to transfer data to leader " << e.what() << std::endl;
+            }
+        }
+       
+    }
+    
     if(items[0] != REQUESTSIGN || items[1] != OPERATIONTYPE){
         std::string resp(RESPSIGN);
         resp += "\t";
@@ -230,28 +253,7 @@ std::string Paxos::handler(const std::string& s){
             resp += "REFUSED"; 
             return resp;
         }
-    } else if(items[0] == "GET"){
-        return kv->Get(items[1]);
-
-    } else if(items[0] == "PUT" || items[0] == "DEL"){
-        if(role == MASTER){
-            commands[this->GenerateProposalID()] = s;
-            for(auto iter = commands.begin(); iter != commands.end(); iter++){
-                std::cout << iter->first << std::endl;
-                std::cout << iter->second << std::endl;
-            }
-        } else {
-            auto items = SplitStr(leader, ':');
-            try{
-                Client* cli = new Client(items[0], items[1]);
-                cli->Write(s);
-                delete cli;
-            }catch(std::exception& e){
-                std::cout << "failed to transfer data to leader " << e.what() << std::endl;
-            }
-        }
-       
-    } else{
+    }  else{
         std::string resp(RESPSIGN);
         resp += "\t";
         resp += RESPERROR;
